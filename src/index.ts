@@ -10,6 +10,7 @@ import {
 import { loadCredentials, deleteCredentials, BridgeCredentials } from "./credentials.js";
 import { runSetupFlow } from "./setup-server.js";
 import { createDraft, listEmails, getEmail, listFolders } from "./imap-client.js";
+import { sendDraft } from "./send-mail.js";
 
 async function ensureCredentials(): Promise<BridgeCredentials> {
   const existing = loadCredentials();
@@ -83,6 +84,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: { type: "object", properties: {} },
     },
     {
+      name: "send_draft",
+      description:
+        "Send an existing draft (by UID) via Proton Bridge SMTP. The draft's From/To/Subject/body are used verbatim. After successful send Proton auto-saves a copy to the Sent folder. The Drafts copy is deleted unless deleteAfter=false.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          uid: { type: "number", description: "IMAP UID of the draft in the Drafts folder (returned by create_draft)." },
+          deleteAfter: { type: "boolean", description: "Delete the draft from Drafts after sending. Default: true.", default: true },
+        },
+        required: ["uid"],
+      },
+    },
+    {
+      name: "open_settings",
+      description:
+        "Open the browser-based settings page to update Bridge credentials, SMTP config, and the read whitelist. Blocks until the user submits the form.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
       name: "reset_credentials",
       description: "Delete stored Bridge credentials. Next request triggers the browser setup flow again.",
       inputSchema: { type: "object", properties: {} },
@@ -97,6 +117,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     deleteCredentials();
     creds = null;
     return { content: [{ type: "text", text: "Credentials deleted. Next create_draft call will trigger setup." }] };
+  }
+
+  if (name === "open_settings") {
+    const updated = await runSetupFlow(loadCredentials());
+    creds = updated;
+    const count = updated.allowedReadAddresses?.length ?? 0;
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Settings saved. User: ${updated.user}. Read whitelist: ${count === 0 ? "(empty — all addresses allowed)" : count + " addresses"}.`,
+        },
+      ],
+    };
   }
 
   if (!creds) creds = await ensureCredentials();
@@ -156,6 +190,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (name === "list_folders") {
       const folders = await listFolders(creds);
       return { content: [{ type: "text", text: JSON.stringify(folders, null, 2) }] };
+    }
+
+    if (name === "send_draft") {
+      if (typeof a.uid !== "number") {
+        throw new McpError(ErrorCode.InvalidParams, "uid (number) is required");
+      }
+      const result = await sendDraft(creds, a.uid, {
+        deleteAfter: typeof a.deleteAfter === "boolean" ? a.deleteAfter : true,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 
     throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

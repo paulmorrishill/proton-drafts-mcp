@@ -91,6 +91,21 @@ Fetch full body + headers of one email by UID. Read-only.
 
 List all IMAP folders available via Bridge.
 
+### `send_draft`
+
+Send an existing draft (by UID) via Bridge SMTP. Proton auto-saves a copy to Sent. Drafts copy is deleted unless `deleteAfter: false`.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uid` | number | yes | UID of the draft (from `create_draft`) |
+| `deleteAfter` | boolean | no | Delete from Drafts after send (default true) |
+
+### `open_settings`
+
+Open the browser settings page to update Bridge IMAP/SMTP credentials and the **read whitelist** (`allowedReadAddresses`). When the whitelist is non-empty, `list_emails`/`get_email` reject addresses not in the list.
+
+Leave whitelist blank to allow reading any inbox address.
+
 ### `reset_credentials`
 
 Delete stored credentials. Next `create_draft` call re-triggers the browser setup flow.

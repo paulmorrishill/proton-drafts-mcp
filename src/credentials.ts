@@ -9,6 +9,9 @@ export interface BridgeCredentials {
   user: string;
   password: string;
   secure: boolean;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  allowedReadAddresses?: string[];
 }
 
 export function loadCredentials(): BridgeCredentials | null {
@@ -24,12 +27,37 @@ export function loadCredentials(): BridgeCredentials | null {
       typeof parsed.password === "string" &&
       typeof parsed.secure === "boolean"
     ) {
-      return parsed;
+      const creds: BridgeCredentials = {
+        host: parsed.host,
+        port: parsed.port,
+        user: parsed.user,
+        password: parsed.password,
+        secure: parsed.secure,
+      };
+      if (typeof parsed.smtpPort === "number") creds.smtpPort = parsed.smtpPort;
+      if (typeof parsed.smtpSecure === "boolean") creds.smtpSecure = parsed.smtpSecure;
+      if (Array.isArray(parsed.allowedReadAddresses)) {
+        creds.allowedReadAddresses = parsed.allowedReadAddresses
+          .filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
+          .map((s: string) => s.trim());
+      }
+      return creds;
     }
     return null;
   } catch {
     return null;
   }
+}
+
+export function isReadAllowed(creds: BridgeCredentials, address: string): boolean {
+  if (!creds.allowedReadAddresses || creds.allowedReadAddresses.length === 0) return true;
+  const t = address.toLowerCase();
+  return creds.allowedReadAddresses.some((a) => a.toLowerCase() === t);
+}
+
+export function anyReadAllowed(creds: BridgeCredentials, addresses: string[]): boolean {
+  if (!creds.allowedReadAddresses || creds.allowedReadAddresses.length === 0) return true;
+  return addresses.some((a) => isReadAllowed(creds, a));
 }
 
 export function saveCredentials(creds: BridgeCredentials): void {

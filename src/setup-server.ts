@@ -3,66 +3,116 @@ import { spawn } from "node:child_process";
 import { AddressInfo } from "node:net";
 import { BridgeCredentials, saveCredentials } from "./credentials.js";
 
-const FORM_HTML = `<!doctype html>
+function escapeAttr(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function renderForm(current: BridgeCredentials | null): string {
+  const host = escapeAttr(current?.host ?? "127.0.0.1");
+  const port = current?.port ?? 1143;
+  const user = escapeAttr(current?.user ?? "");
+  const password = escapeAttr(current?.password ?? "");
+  const secureSel = current?.secure ? "true" : "false";
+  const smtpPort = current?.smtpPort ?? 1025;
+  const smtpSecureSel = current?.smtpSecure ? "true" : "false";
+  const allowed = (current?.allowedReadAddresses ?? []).join("\n");
+  const title = current ? "Update settings" : "First-run setup";
+
+  return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Proton Drafts MCP — Setup</title>
+<title>Proton Drafts MCP — ${title}</title>
 <style>
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #1b1340; color: #eee; max-width: 520px; margin: 40px auto; padding: 0 20px; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #1b1340; color: #eee; max-width: 560px; margin: 40px auto; padding: 0 20px; }
   h1 { color: #8a7cff; }
-  label { display: block; margin: 14px 0 4px; font-size: 14px; }
-  input { width: 100%; padding: 10px; border: 1px solid #444; background: #2a205c; color: #eee; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+  h2 { color: #8a7cff; margin-top: 32px; font-size: 17px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  label { display: block; margin: 12px 0 4px; font-size: 14px; }
+  input, select, textarea { width: 100%; padding: 10px; border: 1px solid #444; background: #2a205c; color: #eee; border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: inherit; }
+  textarea { font-family: ui-monospace, monospace; font-size: 13px; min-height: 90px; resize: vertical; }
   .row { display: flex; gap: 10px; }
   .row > div { flex: 1; }
-  button { margin-top: 20px; padding: 12px 20px; background: #8a7cff; color: #111; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button { margin-top: 24px; padding: 12px 20px; background: #8a7cff; color: #111; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; }
   button:hover { background: #a294ff; }
   small { color: #aaa; display: block; margin-top: 4px; }
-  .help { background: #2a205c; padding: 14px; border-radius: 6px; margin-top: 20px; font-size: 13px; line-height: 1.5; }
+  .help { background: #2a205c; padding: 14px; border-radius: 6px; margin-top: 16px; font-size: 13px; line-height: 1.5; }
 </style>
 </head>
 <body>
-<h1>Proton Drafts MCP — Setup</h1>
-<p>Enter your Proton Bridge IMAP credentials. Saved to Windows Credential Manager under <code>proton-drafts-mcp</code>.</p>
+<h1>Proton Drafts MCP — ${title}</h1>
+<p>Stored in Windows Credential Manager under <code>proton-drafts-mcp</code>.</p>
 <div class="help">
-  <strong>Where to find these:</strong> Open Proton Bridge → click your account → <em>Mailbox details</em>. Use the IMAP host/port, your Proton email as username, and the Bridge-generated password (NOT your Proton login password).
+  <strong>Where to find Bridge values:</strong> Open Proton Bridge → click your account → <em>Mailbox details</em>. Use Bridge-generated password (NOT Proton login password).
 </div>
 <form method="POST" action="/save">
+
+  <h2>IMAP (read drafts/inbox)</h2>
   <label>IMAP Host</label>
-  <input name="host" value="127.0.0.1" required />
+  <input name="host" value="${host}" required />
   <div class="row">
     <div>
-      <label>Port</label>
-      <input name="port" type="number" value="1143" required />
+      <label>IMAP Port</label>
+      <input name="port" type="number" value="${port}" required />
     </div>
     <div>
-      <label>TLS</label>
-      <select name="secure" style="width:100%;padding:10px;background:#2a205c;color:#eee;border:1px solid #444;border-radius:6px;">
-        <option value="false" selected>STARTTLS (default)</option>
-        <option value="true">SSL/TLS</option>
+      <label>IMAP TLS</label>
+      <select name="secure">
+        <option value="false"${secureSel === "false" ? " selected" : ""}>STARTTLS (default)</option>
+        <option value="true"${secureSel === "true" ? " selected" : ""}>SSL/TLS</option>
       </select>
     </div>
   </div>
+
+  <h2>SMTP (send drafts)</h2>
+  <div class="row">
+    <div>
+      <label>SMTP Port</label>
+      <input name="smtpPort" type="number" value="${smtpPort}" required />
+    </div>
+    <div>
+      <label>SMTP TLS</label>
+      <select name="smtpSecure">
+        <option value="false"${smtpSecureSel === "false" ? " selected" : ""}>STARTTLS (port 1025)</option>
+        <option value="true"${smtpSecureSel === "true" ? " selected" : ""}>SSL/TLS (port 1465)</option>
+      </select>
+    </div>
+  </div>
+  <small>SMTP host = IMAP host. Bridge defaults: 1025 STARTTLS or 1465 SSL/TLS.</small>
+
+  <h2>Account</h2>
   <label>Username (Proton email)</label>
-  <input name="user" type="email" required placeholder="you@proton.me" />
+  <input name="user" type="email" value="${user}" required placeholder="you@proton.me" />
   <label>Bridge password</label>
-  <input name="password" type="password" required />
-  <small>Auto-generated by Proton Bridge. Not your login password.</small>
-  <button type="submit">Save & Continue</button>
+  <input name="password" type="password" value="${password}" required />
+  <small>Auto-generated by Proton Bridge. Not your Proton login password.</small>
+
+  <h2>Read whitelist</h2>
+  <label>Allowed read addresses (one per line)</label>
+  <textarea name="allowedReadAddresses" placeholder="foir@example.com&#10;alias@yourdomain.com">${escapeAttr(allowed)}</textarea>
+  <small>Restrict <code>list_emails</code> / <code>get_email</code> to messages addressed to these. Leave blank to allow all.</small>
+
+  <button type="submit">Save & continue</button>
 </form>
 </body>
 </html>`;
+}
 
 const SUCCESS_HTML = `<!doctype html>
 <html><head><meta charset="utf-8"><title>Saved</title>
 <style>body{font-family:sans-serif;background:#1b1340;color:#eee;text-align:center;padding:80px 20px;}h1{color:#8a7cff;}</style>
-</head><body><h1>Credentials saved</h1><p>You can close this tab. The MCP server is starting.</p></body></html>`;
+</head><body><h1>Settings saved</h1><p>You can close this tab.</p></body></html>`;
 
 function parseForm(body: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const pair of body.split("&")) {
-    const [k, v] = pair.split("=");
-    if (k) out[decodeURIComponent(k)] = decodeURIComponent((v ?? "").replace(/\+/g, " "));
+    const eq = pair.indexOf("=");
+    const k = eq >= 0 ? pair.slice(0, eq) : pair;
+    const v = eq >= 0 ? pair.slice(eq + 1) : "";
+    if (k) out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, " "));
   }
   return out;
 }
@@ -77,12 +127,13 @@ function openBrowser(url: string): void {
   }
 }
 
-export function runSetupFlow(): Promise<BridgeCredentials> {
+export function runSetupFlow(current: BridgeCredentials | null = null): Promise<BridgeCredentials> {
   return new Promise((resolve, reject) => {
+    const html = renderForm(current);
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(FORM_HTML);
+        res.end(html);
         return;
       }
       if (req.method === "POST" && req.url === "/save") {
@@ -91,12 +142,19 @@ export function runSetupFlow(): Promise<BridgeCredentials> {
         req.on("end", () => {
           try {
             const form = parseForm(body);
+            const allowed = (form.allowedReadAddresses || "")
+              .split(/\r?\n/)
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
             const creds: BridgeCredentials = {
               host: form.host,
               port: parseInt(form.port, 10),
               user: form.user,
               password: form.password,
               secure: form.secure === "true",
+              smtpPort: parseInt(form.smtpPort || "1025", 10),
+              smtpSecure: form.smtpSecure === "true",
+              allowedReadAddresses: allowed,
             };
             if (!creds.host || !creds.user || !creds.password || !Number.isFinite(creds.port)) {
               res.writeHead(400, { "Content-Type": "text/plain" });
@@ -126,7 +184,7 @@ export function runSetupFlow(): Promise<BridgeCredentials> {
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address() as AddressInfo;
       const url = `http://127.0.0.1:${addr.port}/`;
-      process.stderr.write(`[proton-drafts-mcp] Setup required. Opening browser: ${url}\n`);
+      process.stderr.write(`[proton-drafts-mcp] Setup ${current ? "update" : "required"}. Opening browser: ${url}\n`);
       openBrowser(url);
     });
   });

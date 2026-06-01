@@ -1,6 +1,6 @@
 import { ImapFlow, SearchObject } from "imapflow";
 import { simpleParser } from "mailparser";
-import { BridgeCredentials } from "./credentials.js";
+import { BridgeCredentials, isReadAllowed, anyReadAllowed } from "./credentials.js";
 
 function newClient(creds: BridgeCredentials): ImapFlow {
   return new ImapFlow({
@@ -122,6 +122,11 @@ function matchesAddress(envelopeAddrs: { address?: string }[] | undefined, targe
 }
 
 export async function listEmails(creds: BridgeCredentials, opts: ListEmailsOptions): Promise<EmailSummary[]> {
+  if (!isReadAllowed(creds, opts.to)) {
+    throw new Error(
+      `Address "${opts.to}" is not in the read whitelist. Use open_settings to add it.`
+    );
+  }
   const client = newClient(creds);
   await client.connect();
   try {
@@ -199,6 +204,12 @@ export async function getEmail(
     );
     if (!msg) return null;
     const env = msg.envelope;
+    const toAddresses = (env?.to ?? []).map((a) => a.address ?? "").filter(Boolean);
+    if (!anyReadAllowed(creds, toAddresses)) {
+      throw new Error(
+        `Message UID ${uid} addressed to [${toAddresses.join(", ")}] — none match the read whitelist.`
+      );
+    }
     const parsed = await simpleParser(msg.source as Buffer);
 
     const headers: Record<string, string> = {};
@@ -241,6 +252,40 @@ export async function listFolders(creds: BridgeCredentials): Promise<{ path: str
   try {
     const list = await client.list();
     return list.map((m) => ({ path: m.path, name: m.name, specialUse: m.specialUse }));
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+export async function fetchDraftSource(
+  creds: BridgeCredentials,
+  uid: number
+): Promise<{ source: Buffer; draftsPath: string }> {
+  const client = newClient(creds);
+  await client.connect();
+  try {
+    const draftsPath = await findDraftsMailbox(client);
+    await client.mailboxOpen(draftsPath, { readOnly: true });
+    const msg = await client.fetchOne(String(uid), { uid: true, source: true }, { uid: true });
+    if (!msg || !msg.source) throw new Error(`Draft UID ${uid} not found in ${draftsPath}`);
+    return { source: msg.source as Buffer, draftsPath };
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+export async function deleteDraft(creds: BridgeCredentials, uid: number): Promise<void> {
+  const client = newClient(creds);
+  await client.connect();
+  try {
+    const draftsPath = await findDraftsMailbox(client);
+    await client.mailboxOpen(draftsPath);
+    await client.messageFlagsAdd(String(uid), ["\\Deleted"], { uid: true });
+    try {
+      await client.mailboxClose();
+    } catch {
+      // ignore
+    }
   } finally {
     await client.logout().catch(() => {});
   }
