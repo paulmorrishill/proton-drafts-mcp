@@ -40,6 +40,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           isHtml: { type: "boolean", description: "If true, body is HTML", default: false },
           cc: { type: "string", description: "CC recipient(s), comma-separated" },
           bcc: { type: "string", description: "BCC recipient(s), comma-separated" },
+          from: { type: "string", description: "From address. Must be an address owned by your Proton account (alias, custom domain, @pm.me, etc). Defaults to the configured username." },
         },
         required: ["to", "subject", "body"],
       },
@@ -80,6 +81,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       isHtml: typeof a.isHtml === "boolean" ? a.isHtml : false,
       cc: typeof a.cc === "string" ? a.cc : undefined,
       bcc: typeof a.bcc === "string" ? a.bcc : undefined,
+      from: typeof a.from === "string" ? a.from : undefined,
     });
     return {
       content: [

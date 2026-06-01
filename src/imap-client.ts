@@ -8,9 +8,11 @@ export interface DraftInput {
   isHtml?: boolean;
   cc?: string;
   bcc?: string;
+  from?: string;
 }
 
-function buildMime(input: DraftInput, from: string): string {
+function buildMime(input: DraftInput, defaultFrom: string): string {
+  const from = input.from || defaultFrom;
   const boundary = "----=_proton_drafts_mcp_" + Math.floor(performance.now() * 1000).toString(36);
   const date = new Date().toUTCString();
   const headers: string[] = [
