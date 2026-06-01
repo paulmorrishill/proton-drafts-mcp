@@ -64,6 +64,32 @@ Create a draft email.
 | `isHtml` | boolean | no | If true, body is HTML (default false) |
 | `cc` | string | no | CC recipient(s), comma-separated |
 | `bcc` | string | no | BCC recipient(s), comma-separated |
+| `from` | string | no | From address. Must be an address owned by your Proton account (alias, custom domain, @pm.me). Defaults to the configured username. |
+
+### `list_emails`
+
+List emails sent TO a specific address. **Read-only** — opens mailbox via IMAP `EXAMINE`, so messages are not marked as read or otherwise modified. Returns envelope + short snippet per message, newest first. Pair with `get_email` for body retrieval.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `to` | string | yes | Recipient address to filter by (matches `To:` header) |
+| `folder` | string | no | IMAP folder (default `INBOX`) |
+| `limit` | number | no | Max messages (default 50) |
+| `since` | string | no | Only messages on/after this ISO date |
+| `unseenOnly` | boolean | no | If true, only unread messages |
+
+### `get_email`
+
+Fetch full body + headers of one email by UID. Read-only.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uid` | number | yes | IMAP UID (from `list_emails`) |
+| `folder` | string | no | Folder (default `INBOX`) |
+
+### `list_folders`
+
+List all IMAP folders available via Bridge.
 
 ### `reset_credentials`
 

@@ -43,9 +43,11 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "@napi-rs/keyring": "^1.1.6",
-    "imapflow": "^1.0.171"
+    "imapflow": "^1.0.171",
+    "mailparser": "^3.7.2"
   },
   "devDependencies": {
+    "@types/mailparser": "^3.4.5",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
   }
