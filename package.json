@@ -1,0 +1,52 @@
+{
+  "name": "proton-drafts-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that creates draft emails in Proton Mail via Proton Bridge IMAP",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "proton-drafts-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "protonmail",
+    "proton",
+    "imap",
+    "drafts",
+    "email",
+    "claude"
+  ],
+  "author": "Paul Morris-Hill",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulmorrishill/proton-drafts-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/paulmorrishill/proton-drafts-mcp/issues"
+  },
+  "homepage": "https://github.com/paulmorrishill/proton-drafts-mcp#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@napi-rs/keyring": "^1.1.6",
+    "imapflow": "^1.0.171"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
