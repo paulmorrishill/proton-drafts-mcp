@@ -91,6 +91,14 @@ Fetch full body + headers of one email by UID. Read-only.
 
 List all IMAP folders available via Bridge.
 
+### `delete_draft`
+
+Delete a draft by UID. Marks `\Deleted` + expunges. Irreversible.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uid` | number | yes | UID of the draft to delete |
+
 ### `send_draft`
 
 Send an existing draft (by UID) via Bridge SMTP. Proton auto-saves a copy to Sent. Drafts copy is deleted unless `deleteAfter: false`.

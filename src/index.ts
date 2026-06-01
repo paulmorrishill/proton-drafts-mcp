@@ -9,7 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { loadCredentials, deleteCredentials, BridgeCredentials } from "./credentials.js";
 import { runSetupFlow } from "./setup-server.js";
-import { createDraft, listEmails, getEmail, listFolders } from "./imap-client.js";
+import { createDraft, listEmails, getEmail, listFolders, deleteDraft } from "./imap-client.js";
 import { sendDraft } from "./send-mail.js";
 
 async function ensureCredentials(): Promise<BridgeCredentials> {
@@ -82,6 +82,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: "list_folders",
       description: "List IMAP folders (mailboxes) available via Proton Bridge.",
       inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "delete_draft",
+      description:
+        "Delete a draft by UID from the Drafts folder. Marks \\Deleted then expunges. Irreversible.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          uid: { type: "number", description: "IMAP UID of the draft in the Drafts folder." },
+        },
+        required: ["uid"],
+      },
     },
     {
       name: "send_draft",
@@ -190,6 +202,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (name === "list_folders") {
       const folders = await listFolders(creds);
       return { content: [{ type: "text", text: JSON.stringify(folders, null, 2) }] };
+    }
+
+    if (name === "delete_draft") {
+      if (typeof a.uid !== "number") {
+        throw new McpError(ErrorCode.InvalidParams, "uid (number) is required");
+      }
+      await deleteDraft(creds, a.uid);
+      return { content: [{ type: "text", text: `Draft UID ${a.uid} deleted.` }] };
     }
 
     if (name === "send_draft") {
