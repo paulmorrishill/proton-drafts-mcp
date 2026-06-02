@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { simpleParser, AddressObject } from "mailparser";
 import { BridgeCredentials } from "./credentials.js";
 import { fetchDraftSource, deleteDraft } from "./imap-client.js";
+import { archiveSent } from "./archive.js";
 
 export interface SendDraftResult {
   uid: number;
@@ -11,6 +12,7 @@ export interface SendDraftResult {
   accepted: string[];
   rejected: string[];
   envelope: { from: string; to: string[] };
+  archivedTo?: string;
 }
 
 function smtpTransport(creds: BridgeCredentials) {
@@ -64,6 +66,23 @@ export async function sendDraft(
   const transporter = smtpTransport(creds);
   try {
     const info = await transporter.sendMail({ envelope, raw: source });
+
+    // Archive to disk for record keeping. Best-effort — do not fail send if archive fails.
+    let archivedTo: string | undefined;
+    try {
+      const { emlPath } = await archiveSent(source, {
+        uid,
+        messageId: info.messageId,
+        from: envelope.from,
+        to: envelope.to,
+        subject: parsed.subject,
+        sentAt: new Date().toISOString(),
+      });
+      archivedTo = emlPath;
+    } catch (err) {
+      process.stderr.write(`[proton-drafts-mcp] Archive failed for UID ${uid}: ${(err as Error).message}\n`);
+    }
+
     const deleteAfter = opts.deleteAfter !== false;
     if (deleteAfter) {
       try {
@@ -78,6 +97,7 @@ export async function sendDraft(
           accepted: (info.accepted ?? []) as string[],
           rejected: (info.rejected ?? []) as string[],
           envelope,
+          archivedTo,
         };
       }
     }
@@ -89,6 +109,7 @@ export async function sendDraft(
       accepted: (info.accepted ?? []) as string[],
       rejected: (info.rejected ?? []) as string[],
       envelope,
+      archivedTo,
     };
   } finally {
     transporter.close();
